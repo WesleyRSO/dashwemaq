@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Produção</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background-color 0.2s;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+        .btn-danger {
+            background-color: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+        #notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            color: white;
+            z-index: 1000;
+            display: none;
+        }
+        #notification.success { background-color: #10b981; }
+        #notification.error { background-color: #ef4444; }
+        .tab {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .tab.active {
+            border-bottom-color: #3b82f6;
+            color: #3b82f6;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <!-- Cabeçalho e Navegação -->
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Dashboard de Produção</h1>
+            <nav class="mt-4 border-b">
+                <button id="tabDashboard" class="tab active">Dashboard</button>
+                <button id="tabSchedule" class="tab">Programação</button>
+                <button id="tabData" class="tab">Execução</button>
+            </nav>
+        </header>
+
+        <!-- Seção do Dashboard -->
+        <main id="dashboardView">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="card p-6 flex items-center">
+                    <div class="p-3 rounded-full bg-blue-100 text-blue-600 mr-4"><i data-feather="package"></i></div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Produção Total</p>
+                        <p id="totalProduction" class="text-2xl font-bold">0</p>
+                    </div>
+                </div>
+                <div class="card p-6 flex items-center">
+                    <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4"><i data-feather="check-circle"></i></div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Taxa de Qualidade</p>
+                        <p id="qualityRate" class="text-2xl font-bold">0%</p>
+                    </div>
+                </div>
+                <div class="card p-6 flex items-center">
+                    <div class="p-3 rounded-full bg-red-100 text-red-600 mr-4"><i data-feather="alert-triangle"></i></div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Itens com Defeito</p>
+                        <p id="defectiveItems" class="text-2xl font-bold">0</p>
+                    </div>
+                </div>
+                <div class="card p-6 flex items-center">
+                    <div class="p-3 rounded-full bg-yellow-100 text-yellow-600 mr-4"><i data-feather="bar-chart-2"></i></div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Taxa de Defeitos</p>
+                        <p id="defectRate" class="text-2xl font-bold">0%</p>
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="card p-6"><h2 class="text-xl font-semibold mb-4">Produção por Recurso</h2><div class="chart-container"><canvas id="productionByResourceChart"></canvas></div></div>
+                <div class="card p-6"><h2 class="text-xl font-semibold mb-4">Produção Mensal</h2><div class="chart-container"><canvas id="monthlyProductionChart"></canvas></div></div>
+                <div class="card p-6"><h2 class="text-xl font-semibold mb-4">Produção por Produto</h2><div class="chart-container"><canvas id="productionByProductChart"></canvas></div></div>
+                <div class="card p-6"><h2 class="text-xl font-semibold mb-4">Resumo por Recurso</h2><div class="overflow-x-auto"><table class="w-full text-left" id="resourceSummaryTable"></table></div></div>
+            </div>
+        </main>
+
+        <!-- Seção de Programação -->
+        <main id="scheduleView" class="hidden">
+            <div class="card p-6 mb-8">
+                <h2 class="text-xl font-semibold mb-4">Agendar Nova Ordem de Produção</h2>
+                <form id="scheduleForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="date" id="scheduleDate" class="p-2 border rounded" required>
+                    <input type="text" id="scheduleResource" placeholder="Recurso" class="p-2 border rounded" required>
+                    <input type="text" id="scheduleProduct" placeholder="Produto" class="p-2 border rounded" required>
+                    <input type="number" id="scheduleQuantity" placeholder="Quantidade Programada" class="p-2 border rounded" required min="1">
+                    <button type="submit" class="btn btn-primary md:col-span-2">Salvar Programação</button>
+                </form>
+            </div>
+            <div class="card p-6">
+                 <h2 class="text-xl font-semibold mb-4">Ordens Programadas</h2>
+                 <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="p-2">Data</th>
+                                <th class="p-2">Recurso</th>
+                                <th class="p-2">Produto</th>
+                                <th class="p-2 text-right">Quantidade</th>
+                                <th class="p-2 text-center">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scheduleTableBody">
+                            <!-- Os dados serão inseridos aqui via JS -->
+                        </tbody>
+                    </table>
+                 </div>
+            </div>
+        </main>
+
+        <!-- Seção de Adicionar Dados (Execução) -->
+        <main id="dataView" class="hidden">
+            <div class="card p-6 mb-8">
+                <h2 class="text-xl font-semibold mb-4">Adicionar Novo Registo de Execução</h2>
+                <form id="dataForm" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <input type="date" id="formDate" class="p-2 border rounded" required>
+                    <input type="text" id="formResource" placeholder="Recurso (ex: PRIMINER)" class="p-2 border rounded" required>
+                    <input type="text" id="formProduct" placeholder="Produto (ex: SPP087)" class="p-2 border rounded" required>
+                    <input type="number" id="formProduced" placeholder="Produzido" class="p-2 border rounded" required min="0">
+                    <input type="number" id="formDefects" placeholder="Defeitos" class="p-2 border rounded" required min="0">
+                    <button type="submit" class="btn btn-primary md:col-span-3">Salvar Registo</button>
+                </form>
+            </div>
+            <div class="card p-6">
+                 <h2 class="text-xl font-semibold mb-4">Execução Armazenada</h2>
+                 <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="p-2">Data</th>
+                                <th class="p-2">Recurso</th>
+                                <th class="p-2">Produto</th>
+                                <th class="p-2 text-right">Produzido</th>
+                                <th class="p-2 text-right">Defeitos</th>
+                                <th class="p-2 text-center">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataTableBody"></tbody>
+                    </table>
+                 </div>
+            </div>
+        </main>
+    </div>
+    
+    <div id="notification"></div>
+
+    <!-- Firebase e bibliotecas auxiliares -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        let chartInstances = {};
+        let db, auth, userId;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+
+        const tabDashboard = document.getElementById('tabDashboard');
+        const tabSchedule = document.getElementById('tabSchedule');
+        const tabData = document.getElementById('tabData');
+        const dashboardView = document.getElementById('dashboardView');
+        const scheduleView = document.getElementById('scheduleView');
+        const dataView = document.getElementById('dataView');
+        const dataForm = document.getElementById('dataForm');
+        const scheduleForm = document.getElementById('scheduleForm');
+        const dataTableBody = document.getElementById('dataTableBody');
+        const scheduleTableBody = document.getElementById('scheduleTableBody');
+
+        function switchView(view) {
+            tabDashboard.classList.toggle('active', view === 'dashboard');
+            tabSchedule.classList.toggle('active', view === 'schedule');
+            tabData.classList.toggle('active', view === 'data');
+            dashboardView.classList.toggle('hidden', view !== 'dashboard');
+            scheduleView.classList.toggle('hidden', view !== 'schedule');
+            dataView.classList.toggle('hidden', view !== 'data');
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = type;
+            notification.style.display = 'block';
+            setTimeout(() => { notification.style.display = 'none'; }, 3000);
+        }
+
+        async function addData(event) {
+            event.preventDefault();
+            const newRecord = {
+                DATA: document.getElementById('formDate').value,
+                RECURSO: document.getElementById('formResource').value,
+                PRODUTO: document.getElementById('formProduct').value,
+                PRODUZIDO: Number(document.getElementById('formProduced').value),
+                DEFEITOS: Number(document.getElementById('formDefects').value),
+            };
+            try {
+                await addDoc(collection(db, `/artifacts/${appId}/users/${userId}/productionData`), newRecord);
+                dataForm.reset();
+                showNotification('Registo de execução salvo!', 'success');
+            } catch (error) {
+                showNotification('Erro ao salvar registo de execução.', 'error');
+            }
+        }
+
+        async function addSchedule(event) {
+            event.preventDefault();
+            const newSchedule = {
+                DATA: document.getElementById('scheduleDate').value,
+                RECURSO: document.getElementById('scheduleResource').value,
+                PRODUTO: document.getElementById('scheduleProduct').value,
+                QUANTIDADE: Number(document.getElementById('scheduleQuantity').value),
+            };
+            try {
+                await addDoc(collection(db, `/artifacts/${appId}/users/${userId}/productionSchedule`), newSchedule);
+                scheduleForm.reset();
+                showNotification('Programação salva com sucesso!', 'success');
+            } catch (error) {
+                showNotification('Erro ao salvar programação.', 'error');
+            }
+        }
+
+        async function deleteData(id) {
+            if (confirm('Tem a certeza que deseja apagar este registo?')) {
+                try {
+                    await deleteDoc(doc(db, `/artifacts/${appId}/users/${userId}/productionData/${id}`));
+                    showNotification('Registo apagado.', 'success');
+                } catch (error) {
+                    showNotification('Erro ao apagar o registo.', 'error');
+                }
+            }
+        }
+        window.deleteData = deleteData;
+
+        async function deleteSchedule(id) {
+            if (confirm('Tem a certeza que deseja apagar esta programação?')) {
+                try {
+                    await deleteDoc(doc(db, `/artifacts/${appId}/users/${userId}/productionSchedule/${id}`));
+                    showNotification('Programação apagada.', 'success');
+                } catch (error) {
+                    showNotification('Erro ao apagar a programação.', 'error');
+                }
+            }
+        }
+        window.deleteSchedule = deleteSchedule;
+
+        function renderDataTable(productionData) {
+            dataTableBody.innerHTML = '';
+            productionData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td class="p-2">${new Date(row.DATA).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</td><td class="p-2">${row.RECURSO}</td><td class="p-2">${row.PRODUTO}</td><td class="p-2 text-right">${row.PRODUZIDO}</td><td class="p-2 text-right">${row.DEFEITOS}</td><td class="p-2 text-center"><button class="btn btn-danger btn-sm" onclick="deleteData('${row.id}')"><i data-feather="trash-2" class="w-4 h-4"></i></button></td>`;
+                dataTableBody.appendChild(tr);
+            });
+            feather.replace();
+        }
+
+        function renderScheduleTable(scheduleData) {
+            scheduleTableBody.innerHTML = '';
+            scheduleData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td class="p-2">${new Date(row.DATA).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</td><td class="p-2">${row.RECURSO}</td><td class="p-2">${row.PRODUTO}</td><td class="p-2 text-right">${row.QUANTIDADE}</td><td class="p-2 text-center"><button class="btn btn-danger btn-sm" onclick="deleteSchedule('${row.id}')"><i data-feather="trash-2" class="w-4 h-4"></i></button></td>`;
+                scheduleTableBody.appendChild(tr);
+            });
+            feather.replace();
+        }
+
+        function processAndRenderDashboard(data) {
+            if (data.length === 0) {
+                updateDashboard({ kpis: { totalProduction: 0, defectiveItems: 0, qualityRate: 0, defectRate: 0 }, charts: { productionByResource: {labels:[], data:[]}, monthlyProduction: {labels:[], data:[]}, productionByProduct: {labels:[], data:[]} }, table: {} });
+                return;
+            }
+            let totalProduction = 0, defectiveItems = 0;
+            data.forEach(row => {
+                totalProduction += Number(row.PRODUZIDO) || 0;
+                defectiveItems += Number(row.DEFEITOS) || 0;
+            });
+            const qualityRate = totalProduction > 0 ? ((totalProduction - defectiveItems) / totalProduction * 100).toFixed(1) : 0;
+            const defectRate = totalProduction > 0 ? (defectiveItems / totalProduction * 100).toFixed(1) : 0;
+            const productionByResource = aggregateData(data, 'RECURSO', 'PRODUZIDO');
+            const productionByProduct = aggregateData(data, 'PRODUTO', 'PRODUZIDO');
+            const monthlyProduction = aggregateData(data, 'DATA', 'PRODUZIDO', (date) => new Date(date).toLocaleString('default', { month: 'short', year: '2-digit', timeZone: 'UTC' }));
+            const resourceSummary = data.reduce((acc, row) => {
+                if (!acc[row.RECURSO]) acc[row.RECURSO] = { produced: 0, defects: 0 };
+                acc[row.RECURSO].produced += Number(row.PRODUZIDO) || 0;
+                acc[row.RECURSO].defects += Number(row.DEFEITOS) || 0;
+                return acc;
+            }, {});
+            updateDashboard({ kpis: { totalProduction, defectiveItems, qualityRate, defectRate }, charts: { productionByResource, monthlyProduction, productionByProduct }, table: resourceSummary });
+        }
+
+        function aggregateData(data, groupKey, sumKey, labelFormatter) {
+            const aggregated = data.reduce((acc, row) => {
+                const key = labelFormatter ? labelFormatter(row[groupKey]) : row[groupKey];
+                if (key) acc[key] = (acc[key] || 0) + (Number(row[sumKey]) || 0);
+                return acc;
+            }, {});
+            return { labels: Object.keys(aggregated), data: Object.values(aggregated) };
+        }
+
+        function createOrUpdateChart(id, type, data, options) {
+            if (chartInstances[id]) chartInstances[id].destroy();
+            const ctx = document.getElementById(id).getContext('2d');
+            chartInstances[id] = new Chart(ctx, { type, data, options });
+        }
+        
+        const chartOptions = (extraOptions = {}) => ({ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, ...extraOptions });
+
+        function updateDashboard(data) {
+            document.getElementById('totalProduction').textContent = data.kpis.totalProduction.toLocaleString('pt-BR');
+            document.getElementById('defectiveItems').textContent = data.kpis.defectiveItems.toLocaleString('pt-BR');
+            document.getElementById('qualityRate').textContent = `${data.kpis.qualityRate}%`;
+            document.getElementById('defectRate').textContent = `${data.kpis.defectRate}%`;
+            createOrUpdateChart('productionByResourceChart', 'bar', { labels: data.charts.productionByResource.labels, datasets: [{ label: 'Produção', data: data.charts.productionByResource.data, backgroundColor: 'rgba(59, 130, 246, 0.7)', borderRadius: 4 }] }, chartOptions());
+            createOrUpdateChart('monthlyProductionChart', 'line', { labels: data.charts.monthlyProduction.labels, datasets: [{ label: 'Produção', data: data.charts.monthlyProduction.data, borderColor: 'rgba(16, 185, 129, 1)', tension: 0.4, fill: true, backgroundColor: 'rgba(16, 185, 129, 0.1)' }] }, chartOptions());
+            createOrUpdateChart('productionByProductChart', 'doughnut', { labels: data.charts.productionByProduct.labels, datasets: [{ label: 'Produção', data: data.charts.productionByProduct.data, backgroundColor: ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ef4444', '#f59e0b', '#14b8a6'] }] }, chartOptions({ plugins: { legend: { position: 'bottom' } } }));
+            const tableBody = Object.entries(data.table).map(([resource, values]) => `<tr class="border-b"><td class="py-3 font-medium">${resource}</td><td class="py-3 text-right">${values.produced.toLocaleString('pt-BR')}</td><td class="py-3 text-right">${values.defects.toLocaleString('pt-BR')}</td></tr>`).join('');
+            document.getElementById('resourceSummaryTable').innerHTML = `<thead><tr class="border-b"><th class="py-2">Recurso</th><th class="py-2 text-right">Total Produzido</th><th class="py-2 text-right">Total Defeitos</th></tr></thead><tbody>${tableBody}</tbody>`;
+            feather.replace();
+        }
+
+        async function main() {
+            tabDashboard.addEventListener('click', () => switchView('dashboard'));
+            tabSchedule.addEventListener('click', () => switchView('schedule'));
+            tabData.addEventListener('click', () => switchView('data'));
+            dataForm.addEventListener('submit', addData);
+            scheduleForm.addEventListener('submit', addSchedule);
+            
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                userId = auth.currentUser.uid;
+
+                const dataQuery = query(collection(db, `/artifacts/${appId}/users/${userId}/productionData`), orderBy("DATA", "desc"));
+                onSnapshot(dataQuery, (snapshot) => {
+                    const productionData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    processAndRenderDashboard(productionData);
+                    renderDataTable(productionData);
+                });
+
+                const scheduleQuery = query(collection(db, `/artifacts/${appId}/users/${userId}/productionSchedule`), orderBy("DATA", "asc"));
+                onSnapshot(scheduleQuery, (snapshot) => {
+                    const scheduleData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    renderScheduleTable(scheduleData);
+                });
+
+            } catch (error) {
+                console.error("Erro ao inicializar o Firebase:", error);
+                showNotification("Não foi possível conectar ao banco de dados.", "error");
+            }
+            feather.replace();
+        }
+
+        main();
+    </script>
+</body>
+</html>
